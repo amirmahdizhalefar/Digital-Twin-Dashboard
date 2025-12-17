@@ -1,0 +1,134 @@
+{
+  "id": null,
+  "uid": "solar-cognitive-twin",
+  "title": "Cognitive Solar Digital Twin – Live Demo",
+  "tags": ["solar", "digital-twin", "IASBS"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "refresh": "5s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "توان لحظه‌ای (W)",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["last"] },
+        "orientation": "horizontal",
+        "textMode": "value-and-name",
+        "colorMode": "value",
+        "graphMode": "area",
+        "sparkline": { "show": true, "full": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "#E24D42", "value": 100 },
+              { "color": "yellow", "value": 300 },
+              { "color": "green", "value": 450 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"solar_twin\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"solar_measurement\" and r._field == \"power_w\")\n  |> last()",
+          "datasource": null
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "title": "Gauge توان (W)",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "id": 2,
+      "options": {
+        "orientation": "auto",
+        "showThresholdMarkers": true,
+        "showThresholdLabels": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "min": 0,
+          "max": 600,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 300 },
+              { "color": "green", "value": 500 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"solar_twin\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"solar_measurement\" and r._field == \"power_w\")\n  |> last()",
+          "datasource": null
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "توان و تابش در ۲۴ ساعت گذشته",
+      "gridPos": { "h": 10, "w": 16, "x": 0, "y": 8 },
+      "id": 3,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": { "custom": { "fillOpacity": 10 } }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"solar_twin\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"solar_measurement\")\n  |> filter(fn: (r) => r._field == \"power_w\" or r._field == \"irradiance\")\n  |> pivot(rowKey:[\"_time\"], columnKey:[\"_field\"], valueColumn:\"_value\")\n  |> keep(columns: [\"_time\", \"power_w\", \"irradiance\"])",
+          "datasource": null
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "انرژی امروز (kWh)",
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 0 },
+      "id": 4,
+      "options": {
+        "reduceOptions": { "calcs": ["last"] },
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwh",
+          "decimals": 2
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "import \"date\"\nfrom(bucket:\"solar_twin\")\n |> range(start: today())\n |> filter(fn:(r)=>r._measurement==\"solar_measurement\" and r._field==\"power_w\")\n |> map(fn:(r)=>({ r with kwh: r._value/1000.0/6.0 }))\n |> sum(column:\"kwh\")",
+          "datasource": null
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 18 },
+      "id": 6,
+      "options": {
+        "mode": "html",
+        "content": "<div style=\"text-align:center;font-size:28px;font-weight:bold;color:#ff9800;\">\nCognitive Solar Digital Twin – Live Demo<br>\n<span style=\"font-size:18px;color:#cccccc;\">IASBS – Zanjan | Longi 550W | Simulation Mode</span>\n</div>"
+      }
+    }
+  ],
+  "version": 1
+}

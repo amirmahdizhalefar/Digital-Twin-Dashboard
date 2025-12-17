@@ -1,0 +1,237 @@
+{
+  "id": null,
+  "uid": "solar-cognitive-twin-pro",
+  "title": "Cognitive Solar Digital Twin – Pro Layout",
+  "tags": ["solar", "digital-twin", "IASBS"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "refresh": "5s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Solar Power – Last 24 Hours",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "decimals": 1,
+          "custom": { "fillOpacity": 15 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"solar_twin\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"solar_measurement\" and r._field == \"power_w\")\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)",
+          "datasource": null
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Irradiance and Cell Temperature",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "id": 2,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 10 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "irradiance" },
+            "properties": [
+              { "id": "unit", "value": "wattpm2" },
+              { "id": "custom.axisPlacement", "value": "left" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "temp_cell" },
+            "properties": [
+              { "id": "unit", "value": "celsius" },
+              { "id": "custom.axisPlacement", "value": "right" }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"solar_twin\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"solar_measurement\")\n  |> filter(fn: (r) => r._field == \"irradiance\" or r._field == \"temp_cell\")\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"irradiance\", \"temp_cell\"])",
+          "datasource": null
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Instant Power",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 16 },
+      "id": 3,
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["last"] },
+        "orientation": "horizontal",
+        "textMode": "value-and-name",
+        "colorMode": "value",
+        "graphMode": "area",
+        "sparkline": { "show": true, "full": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 200 },
+              { "color": "green", "value": 400 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"solar_twin\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"solar_measurement\" and r._field == \"power_w\")\n  |> last()",
+          "datasource": null
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Instant Irradiance",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 16 },
+      "id": 4,
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["last"] },
+        "orientation": "horizontal",
+        "textMode": "value-and-name",
+        "colorMode": "value",
+        "graphMode": "area",
+        "sparkline": { "show": true, "full": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "wattpm2",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "dark-blue", "value": null },
+              { "color": "yellow", "value": 400 },
+              { "color": "orange", "value": 800 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"solar_twin\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"solar_measurement\" and r._field == \"irradiance\")\n  |> last()",
+          "datasource": null
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Energy Today",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 16 },
+      "id": 5,
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["last"] },
+        "orientation": "horizontal",
+        "textMode": "value-and-name",
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwh",
+          "decimals": 2
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "import \"date\"\nfrom(bucket: \"solar_twin\")\n  |> range(start: date.truncate(t: now(), unit: 1d))\n  |> filter(fn: (r) => r._measurement == \"solar_measurement\" and r._field == \"power_w\")\n  |> map(fn: (r) => ({ r with kwh: r._value / 1000.0 / 6.0 }))\n  |> sum(column: \"kwh\")",
+          "datasource": null
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Max Power Today",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 16 },
+      "id": 6,
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["max"] },
+        "orientation": "horizontal",
+        "textMode": "value-and-name",
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "decimals": 1
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "import \"date\"\nfrom(bucket: \"solar_twin\")\n  |> range(start: date.truncate(t: now(), unit: 1d))\n  |> filter(fn: (r) => r._measurement == \"solar_measurement\" and r._field == \"power_w\")\n  |> max()",
+          "datasource": null
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "title": "Cell Temperature",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 21 },
+      "id": 7,
+      "options": {
+        "orientation": "auto",
+        "showThresholdMarkers": true,
+        "showThresholdLabels": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "min": -10,
+          "max": 90,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "yellow", "value": 35 },
+              { "color": "red", "value": 60 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"solar_twin\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"solar_measurement\" and r._field == \"temp_cell\")\n  |> last()",
+          "datasource": null
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": { "h": 4, "w": 16, "x": 8, "y": 21 },
+      "id": 8,
+      "options": {
+        "mode": "html",
+        "content": "<div style=\"text-align:center;font-size:24px;font-weight:bold;color:#ff9800;\">\nCognitive Solar Digital Twin – Live Demo<br>\n<span style=\"font-size:14px;color:#cccccc;\">Real-time synthetic data – IASBS Zanjan</span>\n</div>"
+      }
+    }
+  ],
+  "version": 1
+}
